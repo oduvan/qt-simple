@@ -3,14 +3,22 @@ from PyQt5.QtWidgets import QMainWindow, QLabel, QSystemTrayIcon, QMenu, QAction
 from PyQt5.QtGui import QImage, QPixmap, QIcon
 from PyQt5.QtCore import  Qt
 
+import aiohttp
+from asyncqt import QEventLoop, asyncSlot, asyncClose
+import asyncio
+from aiohttp import web
+
 import sys
 import webbrowser
 
 class AppContext(ApplicationContext):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        #self.window = MainWindow(self)
-        #self.stray = SystemTray(self)
+        self.ii = 0
+
+    async def web_get_root(self, request):
+        self.ii += 1
+        return web.Response(text='hi {}'.format(self.ii))
 
     def run(self):
         app = self.app
@@ -40,10 +48,16 @@ class AppContext(ApplicationContext):
         # Add the menu to the tray
         tray.setContextMenu(menu)
 
-        return self.app.exec_()
+        loop = QEventLoop(self.app)
+        asyncio.set_event_loop(loop)
+
+        web_app = web.Application()
+        web_app.router.add_get('/', self.web_get_root)
+
+        return loop.run_until_complete(web._run_app(web_app, port=8765))
 
     def open_site(self):
-        webbrowser.open_new_tab('https://checkio.org/')
+        webbrowser.open_new_tab('http://127.0.0.1:8765/')
 
 
     @cached_property
