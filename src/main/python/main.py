@@ -6,6 +6,7 @@ from PyQt5.QtCore import  Qt
 import aiohttp
 from asyncqt import QEventLoop, asyncSlot, asyncClose
 import asyncio
+import aiohttp_cors
 from aiohttp import web
 
 import sys
@@ -15,6 +16,12 @@ class AppContext(ApplicationContext):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.ii = 0
+        self.opens = 0
+
+    async def web_get_inc_link(self, request):
+        self.opens += 1
+        self.open_site_link.setText('Clicked {}'.format(self.opens))
+        return web.Response(text='OK');
 
     async def web_get_root(self, request):
         self.ii += 1
@@ -35,7 +42,7 @@ class AppContext(ApplicationContext):
 
         # Create the menu
         menu = QMenu()
-        open_site = QAction("Open")
+        self.open_site_link = open_site = QAction("Open")
         open_site.triggered.connect(self.open_site)
 
         menu.addAction(open_site)
@@ -52,12 +59,21 @@ class AppContext(ApplicationContext):
         asyncio.set_event_loop(loop)
 
         web_app = web.Application()
-        web_app.router.add_get('/', self.web_get_root)
 
-        return loop.run_until_complete(web._run_app(web_app, port=8765))
+        cors = aiohttp_cors.setup(web_app, defaults={
+            "*": aiohttp_cors.ResourceOptions(
+                    allow_credentials=True,
+                    expose_headers="*",
+                    allow_headers="*",
+                )
+        })
+        cors.add(web_app.router.add_get('/', self.web_get_root))
+        cors.add(web_app.router.add_get('/inc-link/', self.web_get_inc_link))
+
+        return loop.run_until_complete(web._run_app(web_app, port=8766, host='127.0.0.1'))
 
     def open_site(self):
-        webbrowser.open_new_tab('http://127.0.0.1:8765/')
+        webbrowser.open_new_tab('http://127.0.0.1:8766/')
 
 
     @cached_property
